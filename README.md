@@ -205,8 +205,8 @@ It offers educational guidance and encourages medical consultation.
 
 # 👨‍💻 Author
 
-**Pranav Kamble**
-AI / ML Engineer
+**Pranav Kamble and Aryaman Rane** - ML Team
+**Gaurav Sharma** - Development Team
 
 ---
 
@@ -227,5 +227,6 @@ across language, literacy, and condition complexity.
 ---
 
 **BEAST: Because every health question deserves an answer.**
+
 
 
