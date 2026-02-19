@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# MedQuAD downloaded files
+backend/MedQuAD-master/
+backend/MedQuAD.zip
+
+# Model cache
+.cache/
+*.pt
+*.bin
+
+# Virtual environment
+venv/
+.env
+
+# Node
+frontend/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
