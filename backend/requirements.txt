@@ -1,10 +1,6 @@
 fastapi
 uvicorn
-pandas
-numpy
-requests
-sentence-transformers
-scikit-learn
+google-generativeai
 langdetect
-googletrans==4.0.0-rc1
+python-dotenv
 python-multipart

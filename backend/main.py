@@ -1,259 +1,130 @@
-# backend/main.py
-import os
-import zipfile
-import requests
-import re
-import pandas as pd
-import numpy as np
-import xml.etree.ElementTree as ET
+﻿import os
 from contextlib import asynccontextmanager
+from typing import Literal
+
+import google.generativeai as genai
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-from langdetect import detect
-from googletrans import Translator
 from fastapi.middleware.cors import CORSMiddleware
+from langdetect import LangDetectException, detect
+from pydantic import BaseModel, Field
 
-# Global variables to hold model and data
-app_state = {}
+load_dotenv()
 
-# ======================
-# EXACT LOGIC FUNCTIONS FROM YOUR SCRIPT
-# ======================
+app_state: dict[str, object] = {"gemini_model": None}
 
-def load_medquad_data():
-    """Downloads and parses MedQuAD data exactly as in the notebook."""
-    print("Downloading MedQuAD data...")
-    zip_url = "https://github.com/abachaa/MedQuAD/archive/refs/heads/master.zip"
-    
-    # Download if not exists
-    if not os.path.exists("MedQuAD.zip"):
-        open("MedQuAD.zip", "wb").write(requests.get(zip_url).content)
 
-    with zipfile.ZipFile("MedQuAD.zip", "r") as z:
-        z.extractall(".")
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
 
-    mq_q, mq_a = [], []
-    for root, _, files in os.walk("MedQuAD-master"):
-        for f in files:
-            if f.endswith(".xml"):
-                try:
-                    tree = ET.parse(os.path.join(root, f))
-                    rxml = tree.getroot()
-                    for qa in rxml.findall(".//QAPair"):
-                        q = qa.findtext("Question")
-                        a = qa.findtext("Answer")
-                        if q and a:
-                            mq_q.append(q)
-                            mq_a.append(a)
-                except Exception as e:
-                    pass # Skip malformed files
 
-    return pd.DataFrame({"question": mq_q, "answer": mq_a})
+class QueryRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
+    history: list[ChatMessage] = Field(default_factory=list)
 
-def load_consumer_data():
-    """Loads the hardcoded consumer data."""
-    consumer_data = [
-        # GENERAL
-        ("fever","Fever occurs when the body fights infection."),
-        ("fatigue","Fatigue occurs due to stress or illness."),
-        ("body ache","Body aches occur with viral infection."),
-        ("weakness","Weakness may occur due to dehydration or illness."),
-        # HEAD
-        ("headache","Headache due to tension or dehydration."),
-        ("head hurts","Head pain due to tension."),
-        ("pain in head","Headache symptom."),
-        # RESP
-        ("cough","Cough due to airway irritation."),
-        ("cold","Cold viral infection."),
-        ("sinus pain","Sinus inflammation."),
-        # DIGESTIVE
-        ("gas","Gas causes bloating."),
-        ("bloating","Gas accumulation."),
-        ("acidity","Acid reflux."),
-        ("stomach pain","Indigestion."),
-        # MUSCLE
-        ("back pain","Back strain."),
-        # WOMEN
-        ("vaginal discharge","Discharge infection or hormonal."),
-        ("vaginal smell","Odor due to imbalance."),
-        ("vaginal itching","Fungal irritation."),
-        ("period cramps","Menstrual cramps."),
-        # URINARY
-        ("burning urination","UTI symptom"),
-        # SEMEN COLOR / CONSISTENCY
-        ("blood in semen","Blood in semen inflammation."),
-        ("reddish semen","Blood mixed semen."),
-        ("pink semen","Minor bleeding semen."),
-        ("brown semen","Old blood semen."),
-        ("blood in sperm","Prostate inflammation."),
-        ("rust semen","Old blood."),
-        ("semen color change","Blood presence."),
-        ("runny semen","Low sperm."),
-        ("watery semen","Thin semen."),
-        ("thin semen","Low density sperm."),
-        ("sperm watery","Low concentration.")
-    ]
-    return pd.DataFrame(consumer_data, columns=["question", "answer"])
 
-# Solutions Library (Exact Copy)
-solutions = {
-    "headache":{
-        "summary_en":"Headache usually occurs due to tension, dehydration, or fatigue.",
-        "summary_hi":"सिरदर्द अक्सर तनाव, पानी की कमी या थकान से होता है।",
-        "details_en":["Tension headache most common","Dehydration trigger","Screen strain factor"],
-        "details_hi":["टेंशन सामान्य","पानी कमी","स्क्रीन कारण"],
-        "care_en":["Drink water","Rest","Reduce screen","Pain relief if needed"],
-        "care_hi":["पानी","आराम","स्क्रीन कम","दवा"]
-    },
-    "blood_semen":{
-        "summary_en":"Blood in semen is usually due to prostate or seminal inflammation.",
-        "summary_hi":"वीर्य में खून प्रोस्टेट या ग्रंथि सूजन से होता है।",
-        "details_en":["Often benign","May follow activity","Resolves often"],
-        "details_hi":["अक्सर गंभीर नहीं","गतिविधि बाद","स्वयं ठीक"],
-        "care_en":["Hydrate","Reduce ejaculation","Hygiene","Urologist if recurrent"],
-        "care_hi":["पानी","आवृत्ति कम","स्वच्छता","बार-बार हो तो डॉक्टर"]
-    },
-    "watery_semen":{
-        "summary_en":"Watery semen may indicate low sperm concentration.",
-        "summary_hi":"पतला वीर्य कम शुक्राणु से हो सकता है।",
-        "details_en":["Frequent ejaculation","Low density","Often reversible"],
-        "details_hi":["बार-बार स्खलन","कम घनत्व","सुधर सकता"],
-        "care_en":["Nutrition","Hydration","Reduce frequency","Test if persistent"],
-        "care_hi":["पोषण","पानी","आवृत्ति कम","जांच"]
-    },
-    "vaginal_discharge_odor":{
-        "summary_en":"Foul vaginal odor often indicates bacterial imbalance.",
-        "summary_hi":"योनि की दुर्गंध बैक्टीरियल असंतुलन का संकेत है।",
-        "details_en":["BV common","pH imbalance","Infection possible"],
-        "details_hi":["BV सामान्य","pH गड़बड़ी","संक्रमण"],
-        "care_en":["Hygiene","Cotton underwear","Avoid scented wash","Gynecologist"],
-        "care_hi":["स्वच्छता","कॉटन","सुगंधित न","डॉक्टर"]
-    },
-    "vaginal_itching":{
-        "summary_en":"Vaginal itching often due to fungal infection.",
-        "summary_hi":"योनि खुजली फंगल संक्रमण से।",
-        "details_en":["Candida common","Moisture factor","Irritation"],
-        "details_hi":["कैंडिडा","नमी","जलन"],
-        "care_en":["Keep dry","Cotton","Avoid tight","Antifungal"],
-        "care_hi":["सूखा","कॉटन","ढीले कपड़े","दवा"]
-    },
-    "uti":{
-        "summary_en":"Burning urination due to urinary infection.",
-        "summary_hi":"पेशाब में जलन मूत्र संक्रमण से।",
-        "details_en":["Bacterial infection","Common female","Needs care"],
-        "details_hi":["बैक्टीरिया","महिलाओं में","उपचार"],
-        "care_en":["Water","Do not hold","Hygiene","Doctor"],
-        "care_hi":["पानी","न रोकें","स्वच्छता","डॉक्टर"]
-    }
-}
+def detect_language(text: str) -> str:
+    try:
+        lang = detect(text)
+        return "hi" if lang == "hi" else "en"
+    except LangDetectException:
+        return "en"
 
-# Helper Functions
-def detect_lang(q):
-    try: return detect(q)
-    except: return "en"
 
-def to_en(q, translator):
-    if detect_lang(q) == "hi":
-        return translator.translate(q, src="hi", dest="en").text
-    return q
+def format_history(history: list[ChatMessage]) -> str:
+    if not history:
+        return "No previous conversation."
 
-def to_hi(t, translator):
-    return translator.translate(t, src="en", dest="hi").text
+    lines: list[str] = []
+    for message in history[-12:]:
+        role = "Patient" if message.role == "user" else "Doctor Assistant"
+        lines.append(f"{role}: {message.content.strip()}")
 
-def detect_condition(q):
-    q = q.lower()
-    if any(w in q for w in ["semen","sperm","ejaculate"]) and \
-       any(w in q for w in ["red","reddish","pink","brown","blood","rust"]):
-        return "blood_semen"
-    if any(w in q for w in ["semen","sperm"]) and \
-       any(w in q for w in ["runny","watery","thin"]):
-        return "watery_semen"
-    if "vaginal" in q and any(w in q for w in ["smell","odor"]):
-        return "vaginal_discharge_odor"
-    if "vaginal" in q and "itch" in q:
-        return "vaginal_itching"
-    if any(w in q for w in ["burning urination","burn urine"]):
-        return "uti"
-    if any(w in q for w in ["headache","head hurts","head pain","pain in head"]):
-        return "headache"
-    if "sinus" in q:
-        return "sinusitis"
-    if any(w in q for w in ["gas","bloating","acidity"]):
-        return "gastritis"
-    if "back pain" in q:
-        return "back_pain"
-    if "period" in q and any(w in q for w in ["cramp","pain"]):
-        return "period_cramps"
-    return None
+    return "\n".join(lines)
 
-def generic_medical_advice(text, lang="en"):
-    t = text.lower()
-    care_en = []
-    care_hi = []
 
-    if any(w in t for w in ["infection","viral","bacterial"]):
-        care_en += ["Hydration","Hygiene","Medical care if persistent"]
-        care_hi += ["पानी","स्वच्छता","समस्या रहे तो डॉक्टर"]
-    if any(w in t for w in ["pain","ache"]):
-        care_en += ["Rest","Pain relief if needed"]
-        care_hi += ["आराम","दर्द निवारक"]
-    if any(w in t for w in ["inflammation","swelling"]):
-        care_en += ["Rest affected area","Anti-inflammatory"]
-        care_hi += ["आराम","सूजनरोधी"]
-    if any(w in t for w in ["genetic","syndrome","disorder"]):
-        care_en += ["Specialist evaluation","Supportive care"]
-        care_hi += ["विशेषज्ञ","सहायक देखभाल"]
-    
-    if not care_en:
-        care_en = ["Medical evaluation recommended"]
-        care_hi = ["डॉक्टर से परामर्श"]
-        
-    return care_hi if lang == "hi" else care_en
+def build_triage_prompt(query: str, history_text: str, language_code: str) -> str:
+    response_language = "Hindi" if language_code == "hi" else "English"
+    heading_1 = "1. प्रारंभिक समझ" if language_code == "hi" else "1. Initial understanding"
+    heading_2 = "2. आगे के प्रश्न" if language_code == "hi" else "2. Follow-up questions"
+    heading_3 = "3. अभी क्या करें" if language_code == "hi" else "3. What to do now"
+    heading_4 = (
+        "4. चेतावनी संकेत / कब तुरंत डॉक्टर को दिखाएं"
+        if language_code == "hi"
+        else "4. Red flags / when to seek urgent care"
+    )
+    heading_5 = (
+        "5. महत्वपूर्ण सूचना (यह निदान नहीं है)"
+        if language_code == "hi"
+        else "5. Important note (educational guidance, not a diagnosis)"
+    )
 
-def retrieve(q, df, model, embeddings, translator):
-    q_en = to_en(q, translator)
-    emb = model.encode([q_en])
-    sims = cosine_similarity(emb, embeddings)[0]
-    return df.iloc[np.argmax(sims)]["answer"]
+    return f"""
+You are a calm, careful, doctor-like medical assistant for educational guidance.
 
-# ======================
-# FASTAPI LIFESPAN (STARTUP)
-# ======================
+Strict rules:
+- Respond only in {response_language}.
+- Keep a compassionate and professional tone.
+- Be descriptive and practical for every query.
+- Do not provide a final diagnosis; provide guidance and next steps.
+- If details are missing, ask 3 to 6 focused follow-up questions first.
+- For headache-like complaints, include onset, progression, pain severity,
+  associated symptoms, patient history, and medicines already taken.
+- Include red-flag emergency signs when relevant.
+- Use conversation history and do not repeat questions already answered.
+- Keep semantic quality consistent across languages. A Hindi query should get the same level
+  of detail as an English query for similar medical context.
+- Use markdown with clean spacing.
+- Put a blank line between every section and between list items/paragraph blocks.
+
+Required markdown output template:
+### {heading_1}
+<paragraph>
+
+### {heading_2}
+1. <question>
+2. <question>
+3. <question>
+
+### {heading_3}
+- <action>
+- <action>
+
+### {heading_4}
+- <red flag>
+- <red flag>
+
+### {heading_5}
+<paragraph>
+
+Conversation so far:
+{history_text}
+
+Latest patient message:
+{query}
+""".strip()
+
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Loading Models and Data... This may take a few minutes.")
-    
-    # 1. Load Data
-    medquad_df = load_medquad_data()
-    cons_df = load_consumer_data()
-    df = pd.concat([medquad_df, cons_df], ignore_index=True)
-    
-    # 2. Load Model
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    
-    # 3. Create Embeddings
-    print("Generating Embeddings...")
-    embeddings = model.encode(df["question"].tolist(), show_progress_bar=True)
-    
-    # 4. Initialize Translator
-    translator = Translator()
-    
-    # Store in app state
-    app_state["df"] = df
-    app_state["model"] = model
-    app_state["embeddings"] = embeddings
-    app_state["translator"] = translator
-    
-    print("✅ BEAST v3 BULLETPROOF Assistant Ready.")
+async def lifespan(_: FastAPI):
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+    if api_key:
+        genai.configure(api_key=api_key)
+        app_state["gemini_model"] = genai.GenerativeModel(model_name)
+        print(f"Gemini model initialized: {model_name}")
+    else:
+        app_state["gemini_model"] = None
+        print("GEMINI_API_KEY not set. Gemini responses are unavailable.")
+
     yield
-    # Cleanup if needed
     app_state.clear()
+
 
 app = FastAPI(lifespan=lifespan)
 
-# Enable CORS for React
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -262,66 +133,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class QueryRequest(BaseModel):
-    query: str
 
 @app.post("/api/chat")
 async def chat_endpoint(request: QueryRequest):
-    q = request.query
-    if not q:
+    query = request.query.strip()
+    if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    # Retrieve components from state
-    df = app_state["df"]
-    model = app_state["model"]
-    embeddings = app_state["embeddings"]
-    translator = app_state["translator"]
+    gemini_model = app_state.get("gemini_model")
+    if gemini_model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini is not configured. Add GEMINI_API_KEY in backend environment.",
+        )
 
-    # Logic from generate(q)
-    L = detect_lang(q)
-    cond = detect_condition(q)
+    language_code = detect_language(query)
+    history_text = format_history(request.history)
+    prompt = build_triage_prompt(query, history_text, language_code)
 
-    # BRANCH 1: Exact Condition Match
-    if cond in solutions:
-        data = solutions[cond]
-        # Handle dual language logic explicitly as per your script
-        # Note: Your script logic for "details" and "care" keys in 'solutions' 
-        # actually had separate 'care_en' and 'care_hi' keys.
-        
-        # We access the dict keys dynamically based on L
-        summary_key = "summary_hi" if L == "hi" else "summary_en"
-        details_key = "details_hi" if L == "hi" else "details_en"
-        care_key = "care_hi" if L == "hi" else "care_en"
+    try:
+        result = gemini_model.generate_content(prompt)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}") from exc
 
-        summary = data[summary_key]
-        details_list = data[details_key]
-        care_list = data[care_key]
+    response_text = (getattr(result, "text", None) or "").strip()
 
-        details = "\n".join([f"• {t}" for t in details_list])
-        care = "\n".join([f"• {t}" for t in care_list])
+    if not response_text:
+        if language_code == "hi":
+            response_text = (
+                "### 1. प्रारंभिक समझ\n"
+                "सुरक्षित मार्गदर्शन देने के लिए मुझे थोड़ी और जानकारी चाहिए।\n\n"
+                "### 2. आगे के प्रश्न\n"
+                "1. यह कब शुरू हुआ?\n"
+                "2. दर्द कितना तेज है?\n"
+                "3. आपने कौन-सी दवा ली है?\n\n"
+                "### 3. अभी क्या करें\n"
+                "- आराम करें।\n"
+                "- पानी पिएं और ट्रिगर से बचें।\n\n"
+                "### 4. चेतावनी संकेत / कब तुरंत डॉक्टर को दिखाएं\n"
+                "- अचानक बहुत तेज दर्द, बुखार, भ्रम, कमजोरी, या उल्टी।\n\n"
+                "### 5. महत्वपूर्ण सूचना (यह निदान नहीं है)\n"
+                "यह सामान्य शैक्षिक मार्गदर्शन है। अंतिम निदान के लिए डॉक्टर से सलाह लें।"
+            )
+        else:
+            response_text = (
+                "### 1. Initial understanding\n"
+                "I need a bit more detail to guide you safely.\n\n"
+                "### 2. Follow-up questions\n"
+                "1. When did it start?\n"
+                "2. How severe is it right now?\n"
+                "3. What medicines have you taken?\n\n"
+                "### 3. What to do now\n"
+                "- Rest in a quiet place.\n"
+                "- Hydrate and avoid triggers.\n\n"
+                "### 4. Red flags / when to seek urgent care\n"
+                "- Sudden severe pain, fever, confusion, weakness, or persistent vomiting.\n\n"
+                "### 5. Important note (educational guidance, not a diagnosis)\n"
+                "This is educational guidance only. Please consult a clinician for diagnosis."
+            )
 
-        header = "संभावित स्थिति" if L=="hi" else "Possible condition"
-        details_head = "अधिक जानकारी" if L=="hi" else "Details"
-        action_head = "क्या करें" if L=="hi" else "What you can do"
-        warning = "समस्या बनी रहे तो डॉक्टर से मिलें।" if L=="hi" else "Consult a doctor if persistent."
-
-        response_text = f"🩺 {header}:\n{summary}\n\n📖 {details_head}:\n{details}\n\n✅ {action_head}:\n{care}\n\n⚠️ {warning}"
-        return {"response": response_text}
-
-    # BRANCH 2: RAG Retrieval
-    ans = retrieve(q, df, model, embeddings, translator)
-    short = re.split(r'(?<=[.!?]) +', ans)[0]
-    
-    if L == "hi":
-        short = to_hi(short, translator)
-
-    generic = generic_medical_advice(ans, L)
-    generic_str = "\n".join([f"• {t}" for t in generic])
-
-    header = "संभावित जानकारी" if L=="hi" else "Possible information"
-    action_head = "क्या करें" if L=="hi" else "What you can do"
-    warning = "सही निदान हेतु डॉक्टर से मिलें।" if L=="hi" else "Consult a doctor for diagnosis."
-
-    response_text = f"🩺 {header}:\n{short}\n\n✅ {action_head}:\n{generic_str}\n\n⚠️ {warning}"
-    
     return {"response": response_text}
