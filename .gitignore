@@ -14,7 +14,7 @@ backend/MedQuAD.zip
 # Virtual environment
 venv/
 .env
-
+.env.*
 # Node
 frontend/node_modules/
 
