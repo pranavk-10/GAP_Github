@@ -78,13 +78,30 @@ export default function Home() {
           </section>
 
           <section className={`relative overflow-hidden rounded-3xl p-6 ${cardClass}`}>
-            <div className="relative space-y-4">
-              <div className={isDark ? "ml-auto max-w-[85%] rounded-2xl bg-cyan-700/30 p-4 text-sm leading-6 text-zinc-100" : "ml-auto max-w-[85%] rounded-2xl bg-cyan-100 p-4 text-sm leading-6 text-slate-800"}>
-                I have a headache since last night.
+            {/* Progress bar mock */}
+            <div className="mb-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
+                <span className={isDark ? "text-zinc-500" : "text-slate-400"}>Consultation</span>
+                <span className={isDark ? "text-cyan-400" : "text-cyan-600"}>Question 2 of 5</span>
               </div>
-              <div className={isDark ? "max-w-[92%] rounded-2xl border border-zinc-700 bg-zinc-900 p-4 text-sm leading-6 text-zinc-200" : "max-w-[92%] rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"}>
-                <p className="font-semibold">BEAST triage:</p>
-                <p className="mt-2">I understand. When did it start and what is the severity (1-10)?</p>
+              <div className={`h-1.5 w-full overflow-hidden rounded-full ${isDark ? "bg-zinc-800" : "bg-slate-200"}`}>
+                <div className="h-1.5 w-2/5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-400" />
+              </div>
+            </div>
+
+            {/* Answered Q1 */}
+            <div className={`mb-3 rounded-xl p-3 text-xs ${isDark ? "bg-zinc-900/80 text-zinc-500" : "bg-slate-50 text-slate-500"}`}>
+              <span className="font-semibold text-teal-500">✓ Q1:</span> When did the headache start? — <em>Last night around 10 PM</em>
+            </div>
+
+            {/* Current question */}
+            <div className="relative space-y-3">
+              <div className={isDark ? "ml-auto max-w-[80%] rounded-2xl bg-cyan-700/30 p-3 text-xs leading-5 text-zinc-100" : "ml-auto max-w-[80%] rounded-2xl bg-cyan-100 p-3 text-xs leading-5 text-slate-800"}>
+                It's throbbing, about a 7/10.
+              </div>
+              <div className={isDark ? "max-w-[90%] rounded-2xl border border-zinc-700 bg-zinc-900 p-4 text-sm leading-6 text-zinc-200" : "max-w-[90%] rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"}>
+                <p className={`text-xs font-semibold mb-1 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>Dr. BEAST · Question 2</p>
+                <p className="font-medium">Do you have any associated symptoms like nausea, light or sound sensitivity?</p>
               </div>
             </div>
           </section>

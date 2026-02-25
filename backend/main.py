@@ -1,6 +1,8 @@
-﻿import os
+﻿import json
+import os
+import re
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Literal, Optional
 
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -13,6 +15,10 @@ load_dotenv()
 
 app_state: dict[str, object] = {"gemini_model": None}
 
+MAX_QUESTIONS = 5
+
+
+# ─── Pydantic models ────────────────────────────────────────────────────────
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
@@ -22,7 +28,24 @@ class ChatMessage(BaseModel):
 class QueryRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list)
+    question_count: int = Field(default=0, ge=0, le=10)
 
+
+class QuestioningResponse(BaseModel):
+    stage: Literal["questioning"]
+    question: str
+    question_number: int
+
+
+class FinalResponse(BaseModel):
+    stage: Literal["final"]
+    assessment: str
+    advice: list[str]
+    red_flags: list[str]
+    disclaimer: str
+
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
 
 def detect_language(text: str) -> str:
     try:
@@ -35,81 +58,162 @@ def detect_language(text: str) -> str:
 def format_history(history: list[ChatMessage]) -> str:
     if not history:
         return "No previous conversation."
-
     lines: list[str] = []
     for message in history[-12:]:
-        role = "Patient" if message.role == "user" else "Doctor Assistant"
+        role = "Patient" if message.role == "user" else "Doctor"
         lines.append(f"{role}: {message.content.strip()}")
-
     return "\n".join(lines)
 
 
-def build_triage_prompt(query: str, history_text: str, language_code: str) -> str:
-    response_language = "Hindi" if language_code == "hi" else "English"
-    heading_1 = "1. प्रारंभिक समझ" if language_code == "hi" else "1. Initial understanding"
-    heading_2 = "2. आगे के प्रश्न" if language_code == "hi" else "2. Follow-up questions"
-    heading_3 = "3. अभी क्या करें" if language_code == "hi" else "3. What to do now"
-    heading_4 = (
-        "4. चेतावनी संकेत / कब तुरंत डॉक्टर को दिखाएं"
-        if language_code == "hi"
-        else "4. Red flags / when to seek urgent care"
-    )
-    heading_5 = (
-        "5. महत्वपूर्ण सूचना (यह निदान नहीं है)"
-        if language_code == "hi"
-        else "5. Important note (educational guidance, not a diagnosis)"
-    )
+def extract_json(text: str) -> dict:
+    """Try to extract JSON from Gemini's response even if wrapped in markdown."""
+    # Remove markdown code fences
+    cleaned = re.sub(r"```(?:json)?", "", text).replace("```", "").strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try to find JSON object in the text
+        match = re.search(r"\{[\s\S]*\}", cleaned)
+        if match:
+            return json.loads(match.group())
+        raise
 
-    return f"""
-You are a calm, careful, doctor-like medical assistant for educational guidance.
 
-Strict rules:
-- Respond only in {response_language}.
-- Keep a compassionate and professional tone.
-- Be descriptive and practical for every query.
-- Do not provide a final diagnosis; provide guidance and next steps.
-- If details are missing, ask 3 to 6 focused follow-up questions first.
-- For headache-like complaints, include onset, progression, pain severity,
-  associated symptoms, patient history, and medicines already taken.
-- Include red-flag emergency signs when relevant.
-- Use conversation history and do not repeat questions already answered.
-- Keep semantic quality consistent across languages. A Hindi query should get the same level
-  of detail as an English query for similar medical context.
-- Use markdown with clean spacing.
-- Put a blank line between every section and between list items/paragraph blocks.
+# ─── Prompt builders ────────────────────────────────────────────────────────
 
-Required markdown output template:
-### {heading_1}
-<paragraph>
+def build_questioning_prompt(query: str, history_text: str, language_code: str, question_number: int) -> str:
+    lang = "Hindi" if language_code == "hi" else "English"
+    return f"""You are a calm, empathetic medical assistant conducting a structured patient interview.
 
-### {heading_2}
-1. <question>
-2. <question>
-3. <question>
+RULES:
+- Respond ONLY in {lang}.
+- Ask exactly ONE short, clear follow-up question based on the patient's previous answers.
+- This is question number {question_number} of {MAX_QUESTIONS}.
+- The question must be specific and clinically relevant (e.g. duration, severity, location, associated symptoms, past medical history, medications taken).
+- Do NOT repeat questions already asked in the conversation history.
+- Do NOT provide any advice, diagnosis, or assessment yet.
+- Do NOT ask multiple questions at once.
+- Keep the question concise (1–2 sentences).
+- Return ONLY valid JSON in exactly this format (no markdown, no extra text):
 
-### {heading_3}
-- <action>
-- <action>
-
-### {heading_4}
-- <red flag>
-- <red flag>
-
-### {heading_5}
-<paragraph>
+{{
+  "stage": "questioning",
+  "question": "<your single question here>",
+  "question_number": {question_number}
+}}
 
 Conversation so far:
 {history_text}
 
-Latest patient message:
+Patient's initial complaint / latest message:
 {query}
 """.strip()
 
 
+def build_final_prompt(query: str, history_text: str, language_code: str) -> str:
+    lang = "Hindi" if language_code == "hi" else "English"
+    return f"""You are a calm, empathetic medical assistant who has now gathered enough information about the patient.
+
+RULES:
+- Respond ONLY in {lang}.
+- Based on all conversation history, provide a complete educational assessment.
+- Do NOT provide an official diagnosis — provide educational guidance and next steps.
+- Be practical, compassionate, and clear.
+- Return ONLY valid JSON in exactly this format (no markdown, no extra text):
+
+{{
+  "stage": "final",
+  "assessment": "<2-4 sentence summary of what the patient likely has or what is going on, based on their symptoms>",
+  "advice": [
+    "<actionable advice step 1>",
+    "<actionable advice step 2>",
+    "<actionable advice step 3>",
+    "<actionable advice step 4>"
+  ],
+  "red_flags": [
+    "<warning sign that requires immediate medical attention 1>",
+    "<warning sign 2>",
+    "<warning sign 3>"
+  ],
+  "disclaimer": "<1 sentence educational disclaimer>"
+}}
+
+Conversation so far:
+{history_text}
+
+Patient's latest message:
+{query}
+""".strip()
+
+
+# ─── Fallback responses ─────────────────────────────────────────────────────
+
+def fallback_questioning(question_number: int, language_code: str) -> dict:
+    questions_en = [
+        "How long have you been experiencing these symptoms?",
+        "On a scale of 1–10, how severe is your discomfort right now?",
+        "Are you experiencing any other symptoms alongside this?",
+        "Do you have any relevant medical history or ongoing conditions?",
+        "Have you taken any medications or tried any remedies? If so, did they help?",
+    ]
+    questions_hi = [
+        "आपको यह लक्षण कब से हैं?",
+        "1 से 10 के पैमाने पर, अभी आपकी तकलीफ़ कितनी तेज है?",
+        "क्या इसके साथ कोई और लक्षण भी हैं?",
+        "क्या आपका कोई पुराना रोग या चिकित्सा इतिहास है?",
+        "क्या आपने कोई दवा ली है? यदि हाँ, तो क्या उससे आराम मिला?",
+    ]
+    idx = min(question_number - 1, 4)
+    questions = questions_hi if language_code == "hi" else questions_en
+    return {
+        "stage": "questioning",
+        "question": questions[idx],
+        "question_number": question_number,
+    }
+
+
+def fallback_final(language_code: str) -> dict:
+    if language_code == "hi":
+        return {
+            "stage": "final",
+            "assessment": "आपके द्वारा बताए गए लक्षणों के आधार पर, यह सामान्य स्वास्थ्य समस्या हो सकती है। कृपया किसी चिकित्सक से परामर्श लें।",
+            "advice": [
+                "पर्याप्त आराम करें।",
+                "अच्छे से हाइड्रेट रहें — पानी और इलेक्ट्रोलाइट्स लें।",
+                "यदि लक्षण बने रहें तो नजदीकी डॉक्टर से मिलें।",
+                "किसी भी नई दवा से पहले डॉक्टर की सलाह लें।",
+            ],
+            "red_flags": [
+                "अचानक तेज दर्द या सांस लेने में तकलीफ",
+                "बेहोशी या भ्रम की स्थिति",
+                "लक्षणों का तेजी से बिगड़ना",
+            ],
+            "disclaimer": "यह शैक्षिक मार्गदर्शन है, कोई चिकित्सीय निदान नहीं। निदान के लिए डॉक्टर से मिलें।",
+        }
+    return {
+        "stage": "final",
+        "assessment": "Based on the symptoms you've described, this may be a common health concern. However, a proper evaluation by a qualified doctor is needed to confirm anything.",
+        "advice": [
+            "Get adequate rest and avoid strenuous activity.",
+            "Stay well hydrated — drink water and consider electrolytes.",
+            "If symptoms persist or worsen, visit a doctor soon.",
+            "Do not self-medicate with prescription drugs without a doctor's advice.",
+        ],
+        "red_flags": [
+            "Sudden severe pain or difficulty breathing",
+            "Loss of consciousness or confusion",
+            "Rapid worsening of symptoms",
+        ],
+        "disclaimer": "This is educational guidance only and does not constitute a medical diagnosis. Please consult a qualified clinician.",
+    }
+
+
+# ─── App setup ──────────────────────────────────────────────────────────────
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
     if api_key:
         genai.configure(api_key=api_key)
@@ -134,6 +238,8 @@ app.add_middleware(
 )
 
 
+# ─── Endpoint ────────────────────────────────────────────────────────────────
+
 @app.post("/api/chat")
 async def chat_endpoint(request: QueryRequest):
     query = request.query.strip()
@@ -149,47 +255,27 @@ async def chat_endpoint(request: QueryRequest):
 
     language_code = detect_language(query)
     history_text = format_history(request.history)
-    prompt = build_triage_prompt(query, history_text, language_code)
+    question_number = request.question_count + 1
+    is_final = request.question_count >= MAX_QUESTIONS
+
+    # Choose prompt based on stage
+    if is_final:
+        prompt = build_final_prompt(query, history_text, language_code)
+    else:
+        prompt = build_questioning_prompt(query, history_text, language_code, question_number)
 
     try:
         result = gemini_model.generate_content(prompt)
+        response_text = (getattr(result, "text", None) or "").strip()
+        data = extract_json(response_text)
+    except json.JSONDecodeError:
+        # JSON parsing failed — use fallback
+        data = fallback_final(language_code) if is_final else fallback_questioning(question_number, language_code)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}") from exc
 
-    response_text = (getattr(result, "text", None) or "").strip()
+    # Normalise stage field in case Gemini misses it
+    if "stage" not in data:
+        data["stage"] = "final" if is_final else "questioning"
 
-    if not response_text:
-        if language_code == "hi":
-            response_text = (
-                "### 1. प्रारंभिक समझ\n"
-                "सुरक्षित मार्गदर्शन देने के लिए मुझे थोड़ी और जानकारी चाहिए।\n\n"
-                "### 2. आगे के प्रश्न\n"
-                "1. यह कब शुरू हुआ?\n"
-                "2. दर्द कितना तेज है?\n"
-                "3. आपने कौन-सी दवा ली है?\n\n"
-                "### 3. अभी क्या करें\n"
-                "- आराम करें।\n"
-                "- पानी पिएं और ट्रिगर से बचें।\n\n"
-                "### 4. चेतावनी संकेत / कब तुरंत डॉक्टर को दिखाएं\n"
-                "- अचानक बहुत तेज दर्द, बुखार, भ्रम, कमजोरी, या उल्टी।\n\n"
-                "### 5. महत्वपूर्ण सूचना (यह निदान नहीं है)\n"
-                "यह सामान्य शैक्षिक मार्गदर्शन है। अंतिम निदान के लिए डॉक्टर से सलाह लें।"
-            )
-        else:
-            response_text = (
-                "### 1. Initial understanding\n"
-                "I need a bit more detail to guide you safely.\n\n"
-                "### 2. Follow-up questions\n"
-                "1. When did it start?\n"
-                "2. How severe is it right now?\n"
-                "3. What medicines have you taken?\n\n"
-                "### 3. What to do now\n"
-                "- Rest in a quiet place.\n"
-                "- Hydrate and avoid triggers.\n\n"
-                "### 4. Red flags / when to seek urgent care\n"
-                "- Sudden severe pain, fever, confusion, weakness, or persistent vomiting.\n\n"
-                "### 5. Important note (educational guidance, not a diagnosis)\n"
-                "This is educational guidance only. Please consult a clinician for diagnosis."
-            )
-
-    return {"response": response_text}
+    return data
