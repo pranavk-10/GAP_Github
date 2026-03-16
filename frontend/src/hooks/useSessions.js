@@ -35,6 +35,7 @@ export default function useSessions() {
 
   return {
     sessions,
+    setSessions,
     activeSession,
     setActiveSessionId,
     updateActiveSession,

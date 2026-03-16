@@ -1,6 +1,10 @@
 fastapi
 uvicorn
+google-genai
 google-generativeai
 langdetect
 python-dotenv
 python-multipart
+motor
+python-jose[cryptography]
+bcrypt

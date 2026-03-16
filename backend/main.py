@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import re
 from contextlib import asynccontextmanager
@@ -6,10 +6,13 @@ from typing import Literal, Optional
 
 import google.generativeai as genai
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from langdetect import LangDetectException, detect
 from pydantic import BaseModel, Field
+
+from auth import create_token, decode_token, hash_password, verify_password
+from database import get_sessions_col, get_users_col
 
 load_dotenv()
 
@@ -279,3 +282,95 @@ async def chat_endpoint(request: QueryRequest):
         data["stage"] = "final" if is_final else "questioning"
 
     return data
+
+
+# ─── Auth models ─────────────────────────────────────────────────────────────
+
+class AuthRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=6, max_length=200)
+
+
+class SessionPayload(BaseModel):
+    session_id: str
+    title: str = "New consultation"
+    stage: str = "idle"
+    symptom: str = ""
+    question_count: int = 0
+    current_question_number: int = 0
+    answered_qa: list = []
+    diagnosis: Optional[dict] = None
+    created_at: int = 0
+
+
+# ─── Auth endpoints ───────────────────────────────────────────────────────────
+
+@app.post("/auth/register")
+async def register(body: AuthRequest):
+    users = get_users_col()
+    existing = await users.find_one({"email": body.email.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    new_user = {
+        "email": body.email.lower(),
+        "password": hash_password(body.password),
+    }
+    result = await users.insert_one(new_user)
+    user_id = str(result.inserted_id)
+    token = create_token(user_id)
+    return {"token": token, "user": {"id": user_id, "email": body.email.lower()}}
+
+
+@app.post("/auth/login")
+async def login(body: AuthRequest):
+    users = get_users_col()
+    user = await users.find_one({"email": body.email.lower()})
+    if not user or not verify_password(body.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    user_id = str(user["_id"])
+    token = create_token(user_id)
+    return {"token": token, "user": {"id": user_id, "email": user["email"]}}
+
+
+# ─── Session endpoints ────────────────────────────────────────────────────────
+
+def _get_user_id(request: Request) -> Optional[str]:
+    """Read JWT from Authorization header. Returns None if missing/invalid."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    return decode_token(auth[7:])
+
+
+@app.get("/sessions")
+async def get_sessions(request: Request):
+    user_id = _get_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    sessions = get_sessions_col()
+    cursor = sessions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).limit(50)
+    docs = await cursor.to_list(length=50)
+    return {"sessions": docs}
+
+
+@app.post("/sessions")
+async def save_session(request: Request, body: SessionPayload):
+    user_id = _get_user_id(request)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    sessions = get_sessions_col()
+    doc = body.model_dump()
+    doc["user_id"] = user_id
+
+    # Upsert by session_id so repeated saves update the same document
+    await sessions.update_one(
+        {"session_id": body.session_id, "user_id": user_id},
+        {"$set": doc},
+        upsert=True,
+    )
+    return {"ok": True}
+
