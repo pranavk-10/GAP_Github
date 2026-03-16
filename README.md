@@ -1,234 +1,200 @@
 # 🧠⚕️ BEAST — Multilingual AI Medical Symptom Assistant
 
-> A hybrid clinical-knowledge + symptom-reasoning medical AI that understands real human health queries and returns **clear explanations, practical care steps, and bilingual guidance** — even for rare diseases.
+> An AI-powered doctor-style consultation assistant that asks questions one by one, understands Hindi/Hinglish/English, and helps you find nearby hospitals after diagnosis.
 
 ---
 
-# 🚀 Overview
+## 🚀 Overview
 
-**BEAST (Bilingual Engine for AI Symptom Triage)** is a bulletproof medical query assistant designed to bridge the gap between:
+**BEAST (Bilingual Engine for AI Symptom Triage)** is a full-stack medical query assistant with:
 
-* everyday symptom concerns
-* reproductive & intimate health questions
-* clinical disease knowledge
-* rare medical conditions
-
-Unlike traditional symptom bots that rely only on predefined rules or datasets, BEAST combines:
-
-* medical knowledge bases
-* semantic NLP retrieval
-* condition reasoning
-* universal care generation
-
-to ensure **every user query always receives meaningful guidance**.
+- 🩺 **Doctor-style Q&A wizard** — asks 4–5 focused follow-up questions before giving a final assessment
+- 🌍 **Trilingual** — English, Hindi, and Hinglish input/output (auto-detected)
+- 🗺️ **Hospital Map** — finds nearby hospitals, clinics, and GPs on a live Leaflet map after diagnosis
+- 🔐 **User Auth** — JWT-based login/signup to save and revisit consultation history
+- 📱 **Modern React UI** — dark mode, session sidebar, responsive design
 
 ---
 
-# 🎯 Problem
-
-Most medical chatbots fail because they:
-
-* cannot understand natural symptom language
-* ignore reproductive / sensitive health
-* return long clinical text without care advice
-* lack coverage for both common and rare conditions
-* provide no response when dataset mismatch occurs
-
-This leads to unsafe or unusable outputs.
-
----
-
-# 💡 Solution
-
-BEAST introduces a hybrid medical intelligence architecture:
-
-1. **Symptom Detection Engine**
-   Interprets real-world phrasing
-   (e.g., “my head hurts”, “reddish sperm”, “vaginal smell”)
-
-2. **Clinical Knowledge Retrieval**
-   Uses MedQuAD biomedical dataset for disease grounding
-
-3. **Consumer Health Layer**
-   Covers everyday symptoms & lifestyle issues
-
-4. **Reproductive & Intimate Health Module**
-   Explicit coverage of sensitive queries often ignored
-
-5. **Condition-Specific Care Library**
-   Structured summaries, causes, and actionable care
-
-6. **Universal Medical Fallback Engine**
-   Guarantees solutions even for unknown or rare diseases
-
-7. **Bilingual Response System**
-   Automatic Hindi ↔ English understanding and output
-
----
-
-# 🏗️ Architecture
+## 🏗️ Architecture
 
 ```
-User Query
-    ↓
-Language Detection
-    ↓
-Symptom / Condition Detection
-    ↓
-IF condition match → structured medical response
-ELSE → semantic dataset retrieval
-    ↓
-Universal medical reasoning engine
-    ↓
-Bilingual comprehensive guidance
+User enters symptom
+        ↓
+Language Detection (langdetect)
+        ↓
+Gemini AI — asks 4–5 focused questions one by one
+        ↓
+After answers → structured Final Assessment
+  • Assessment summary
+  • What to do now (advice list)
+  • Red flags (seek urgent care if…)
+  • Disclaimer
+        ↓
+"Find Nearby Hospitals" button
+        ↓
+Browser Geolocation → Overpass API (OpenStreetMap)
+        ↓
+Leaflet map with colour-coded pins
+  🟠 Specialist match  🔴 Hospital  🟣 Clinic  🟢 GP/Centre
+        ↓
+Click pin → Get Directions (Google Maps)
 ```
 
 ---
 
-# 📚 Datasets
+## ✨ Features
 
-### 🧬 MedQuAD
-
-Biomedical Q&A from NIH, NLM, GARD
-→ rare diseases & clinical conditions
-
-### 🧍 Consumer Symptom Dataset
-
-Everyday health complaints
-→ headache, gas, fatigue, sinus, etc
-
-### ❤️ Reproductive Health Extension
-
-Sensitive & intimate conditions
-→ vaginal health, semen changes, UTI
-
-Combined into a unified medical knowledge base.
+| Feature | Details |
+|---|---|
+| 🩺 Step-by-step consultation | AI asks questions one at a time, like a doctor |
+| 🌍 Trilingual | Auto-detects English / Hindi / Hinglish — replies in same language |
+| 🗺️ Hospital Map | Full-screen Leaflet map with nearby hospitals, clinics & GPs |
+| 🎯 Specialty detection | Map prioritises relevant specialists (Neurology for headache, Psychiatry for anxiety, etc.) |
+| 🔐 Auth (optional) | JWT login/signup — history saved to MongoDB |
+| 📂 Session Sidebar | Browse past consultations (logged-in users) |
+| 🌙 Dark mode | Full dark/light theme toggle |
+| 🚫 No empty responses | Universal fallback for rare/unknown conditions |
 
 ---
 
-# ✨ Features
+## ⚙️ Tech Stack
 
-* 🗣️ Natural symptom understanding
-* 🌍 Hindi + English input/output
-* 🩺 Condition explanation + causes
-* ✅ Practical care recommendations
-* 🔁 Works for rare diseases
-* 🔒 Handles sensitive health safely
-* 📊 Semantic medical retrieval
-* 🧠 Universal medical reasoning
-* 🚫 No empty responses
+### Backend
+- **Python / FastAPI** — REST API
+- **Google Gemini AI** (`google-genai`) — symptom reasoning + multilingual Q&A
+- **LangDetect** — auto language detection
+- **Motor** — async MongoDB driver
+- **python-jose** — JWT tokens
+- **bcrypt** — password hashing
+- **MongoDB Atlas** (`cssdb`) — user data + session history
 
----
-
-# 🧪 Example Queries
-
-**Input:**
-`my head hurts`
-
-**Output:**
-Possible condition: Headache
-Details: tension, dehydration, screen strain
-What you can do: hydration, rest, reduce screen
+### Frontend
+- **React + Vite** — SPA
+- **TailwindCSS** — styling
+- **Leaflet.js** — interactive hospital map
+- **Overpass API** (OpenStreetMap) — free hospital/clinic data, no API key needed
+- **React Router** — page routing
+- **Axios** — API calls
 
 ---
 
-**Input:**
-`reddish semen`
+## 🗂️ Project Structure
 
-**Output:**
-Possible condition: Blood in semen
-Details: prostate inflammation, minor bleeding
-What you can do: hydration, hygiene, reduce ejaculation
-
----
-
-**Input:**
-`rare genetic syndrome`
-
-**Output:**
-Possible condition: genetic disorder
-What you can do: specialist evaluation, supportive care
-
----
-
-# 🧠 Key Innovations
-
-* Hybrid clinical + consumer medical AI
-* Universal care generation engine
-* Reproductive health inclusion
-* Dataset bias compensation layer
-* Symptom phrasing normalization
-* Bulletproof fallback logic
-
----
-
-# ⚙️ Tech Stack
-
-* Python
-* Sentence-Transformers (MiniLM)
-* Semantic similarity (cosine)
-* MedQuAD biomedical dataset
-* Google Translate API
-* LangDetect
-* Jupyter / Colab UI
+```
+GAP_Github/
+├── backend/
+│   ├── main.py          # FastAPI app + AI endpoints + auth endpoints
+│   ├── auth.py          # JWT + bcrypt helpers
+│   ├── database.py      # MongoDB connection (Motor)
+│   ├── requirements.txt
+│   └── .env             # GEMINI_API_KEY, MONGO_CONNECTION_URI, JWT_SECRET
+└── frontend/
+    └── src/
+        ├── pages/
+        │   ├── Chat.jsx      # Main consultation page
+        │   └── MapPage.jsx   # Full-screen hospital map
+        ├── components/
+        │   ├── chat/
+        │   │   ├── DiagnosisCard.jsx   # Final result + hospital button
+        │   │   └── QuestionCard.jsx    # Individual question UI
+        │   ├── layout/
+        │   │   ├── Header.jsx          # Login/logout
+        │   │   └── Sidebar.jsx         # Session history
+        │   └── AuthModal.jsx           # Login / Sign up modal
+        ├── hooks/
+        │   ├── useAuth.js      # JWT state management
+        │   └── useSessions.js  # Session list state
+        └── services/
+            └── chatServics.js  # API calls incl. session save/load
+```
 
 ---
 
-# 🩺 Safety
+## 🛠️ Setup
 
-BEAST does **not provide diagnosis**.
-It offers educational guidance and encourages medical consultation.
+### 1. Backend
 
----
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
-# 📈 Applications
+Create `.env`:
+```env
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.0-flash
+MONGO_CONNECTION_URI=mongodb+srv://user:password@cluster.mongodb.net/?appName=Cluster0
+JWT_SECRET=your_secret_here
+```
 
-* Symptom triage assistants
-* Telehealth pre-screening
-* Healthcare chatbots
-* Medical education tools
-* Multilingual health access
-* Rural health tech
+```bash
+uvicorn main:app --reload
+```
 
----
+### 2. Frontend
 
-# 🚀 Future Work
-
-* Severity scoring
-* Emergency detection
-* Doctor specialty mapping
-* Location-based recommendations
-* Voice input
-* Mobile deployment
-
----
-
-# 👥 Team
-
-**ML Team**
-
-* Pranav Kamble
-* Aryaman Rane
-
-**Development Team**
-
-* Gaurav Sharma
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
-# ⭐ Project Status
+## 🔑 API Endpoints
 
-✅ Clinical-grade prototype complete
-🔬 Dataset-augmented
-🧠 Reasoning-enabled
-🚀 Ready for expansion
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/chat` | Send symptom / answer, get next question or final result |
+| POST | `/auth/register` | Register new user, returns JWT |
+| POST | `/auth/login` | Login, returns JWT |
+| GET | `/sessions` | Get saved sessions (requires JWT) |
+| POST | `/sessions` | Save/update a session (requires JWT) |
 
 ---
 
-# ❤️ Vision
+## 🗺️ Hospital Map
 
-Accessible medical guidance for everyone —
-across language, literacy, and condition complexity.
+After a consultation, click **"🏥 Find Nearby Hospitals"** to open the full-screen map:
+
+- Allows browser location access
+- Queries **Overpass API** (free, no key needed) for hospitals, clinics, GPs within 7 km
+- Detects relevant specialty from your assessment text and prioritises those facilities
+- Colour-coded pins: 🟠 Specialist · 🔴 Hospital · 🟣 Clinic · 🟢 GP
+- Click any pin → popup with name, phone, **"Get Directions"** (Google Maps)
+
+---
+
+## 🔐 Authentication
+
+- **Anonymous use** fully supported — no login required to consult the bot
+- **Login / Sign up** → sessions saved to MongoDB and accessible from the sidebar
+- Passwords hashed with **bcrypt**, tokens signed with **JWT** (30-day expiry)
+- Stored in `localStorage` on the frontend
+
+---
+
+## 🩺 Safety
+
+BEAST does **not provide medical diagnosis**.
+It offers educational guidance and strongly encourages professional medical consultation.
+
+---
+
+## 📈 Applications
+
+- Symptom triage assistants
+- Telehealth pre-screening
+- Healthcare chatbots
+- Multilingual health access (rural / regional)
+
+---
+
+## 👥 Team
+
+**ML Team** — Pranav Kamble · Aryaman Rane  
+**Development** — Gaurav Sharma
 
 ---
 

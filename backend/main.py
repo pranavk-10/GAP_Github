@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import re
 from contextlib import asynccontextmanager
@@ -366,7 +366,6 @@ async def save_session(request: Request, body: SessionPayload):
     doc = body.model_dump()
     doc["user_id"] = user_id
 
-    # Upsert by session_id so repeated saves update the same document
     await sessions.update_one(
         {"session_id": body.session_id, "user_id": user_id},
         {"$set": doc},
