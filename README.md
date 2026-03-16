@@ -124,7 +124,7 @@ Create `.env`:
 ```env
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.0-flash
-MONGO_CONNECTION_URI=mongodb+srv://user:password@cluster.mongodb.net/?appName=Cluster0
+MONGO_CONNECTION_URI=your_mongo_uri_here
 JWT_SECRET=your_secret_here
 ```
 
