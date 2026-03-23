@@ -1,12 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaClipboardList, FaListUl, FaExclamationTriangle,
-  FaInfoCircle, FaRedo, FaHospital,
+  FaInfoCircle, FaRedo, FaHospital, FaVolumeUp, FaStop
 } from "react-icons/fa";
 
 export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, onReset, isDark, cardClass }) {
   const navigate = useNavigate();
+  const [speakingSection, setSpeakingSection] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleSpeak = (section, textparts) => {
+    if (!window.speechSynthesis) return;
+
+    if (speakingSection === section) {
+      window.speechSynthesis.cancel();
+      setSpeakingSection(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const plainText = Array.isArray(textparts) ? textparts.filter(Boolean).join(". ") : textparts;
+    const utterance = new SpeechSynthesisUtterance(plainText);
+
+    if (/[\u0900-\u097F]/.test(plainText)) {
+      utterance.lang = "hi-IN";
+    } else {
+      utterance.lang = "en-IN";
+    }
+
+    utterance.onend = () => setSpeakingSection(null);
+    utterance.onerror = () => setSpeakingSection(null);
+
+    setSpeakingSection(section);
+    window.speechSynthesis.speak(utterance);
+  };
 
   if (!diagnosis) return null;
   const { assessment, advice = [], red_flags = [], disclaimer } = diagnosis;
@@ -40,11 +76,25 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
 
       {/* ── Assessment ── */}
       <div className={`rounded-3xl p-6 ${cardClass}`}>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15">
-            <FaClipboardList size={14} className="text-cyan-500" />
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15">
+              <FaClipboardList size={14} className="text-cyan-500" />
+            </div>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-500">Assessment</h3>
           </div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-500">Assessment</h3>
+          
+          <button
+            onClick={() => handleSpeak('assessment', assessment)}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+              speakingSection === 'assessment'
+                ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                : "bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20"
+            }`}
+            title={speakingSection === 'assessment' ? "Stop Voice" : "Read Aloud"}
+          >
+            {speakingSection === 'assessment' ? <FaStop size={12} /> : <FaVolumeUp size={14} />}
+          </button>
         </div>
         <p className={`text-sm leading-relaxed ${isDark ? "text-zinc-200" : "text-slate-700"}`}>
           {assessment}
@@ -54,11 +104,25 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
       {/* ── Advice ── */}
       {advice.length > 0 && (
         <div className={`rounded-3xl p-6 ${cardClass}`}>
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-500/15">
-              <FaListUl size={14} className="text-teal-500" />
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-500/15">
+                <FaListUl size={14} className="text-teal-500" />
+              </div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-teal-500">What to do now</h3>
             </div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-teal-500">What to do now</h3>
+            
+            <button
+              onClick={() => handleSpeak('advice', advice)}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                speakingSection === 'advice'
+                  ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                  : "bg-teal-500/10 text-teal-500 hover:bg-teal-500/20"
+              }`}
+              title={speakingSection === 'advice' ? "Stop Voice" : "Read Aloud"}
+            >
+              {speakingSection === 'advice' ? <FaStop size={12} /> : <FaVolumeUp size={14} />}
+            </button>
           </div>
           <ul className="flex flex-col gap-2">
             {advice.map((item, i) => (
@@ -76,11 +140,25 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
       {/* ── Red flags ── */}
       {red_flags.length > 0 && (
         <div className={`rounded-3xl border p-6 ${isDark ? "border-red-900/50 bg-red-950/30" : "border-red-100 bg-red-50"}`}>
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-500/15">
-              <FaExclamationTriangle size={14} className="text-red-500" />
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-500/15">
+                <FaExclamationTriangle size={14} className="text-red-500" />
+              </div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-red-500">Seek urgent care if…</h3>
             </div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-red-500">Seek urgent care if…</h3>
+            
+            <button
+              onClick={() => handleSpeak('red_flags', red_flags)}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                speakingSection === 'red_flags'
+                  ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                  : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+              }`}
+              title={speakingSection === 'red_flags' ? "Stop Voice" : "Read Aloud"}
+            >
+              {speakingSection === 'red_flags' ? <FaStop size={12} /> : <FaVolumeUp size={14} />}
+            </button>
           </div>
           <ul className="flex flex-col gap-2">
             {red_flags.map((flag, i) => (
