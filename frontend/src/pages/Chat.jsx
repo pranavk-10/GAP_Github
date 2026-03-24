@@ -52,6 +52,7 @@ export default function Chat() {
             currentQuestionNumber: s.current_question_number,
             answeredQA: s.answered_qa || [],
             diagnosis: s.diagnosis || null,
+            followUpMessages: s.follow_up_messages || [],
             createdAt: s.created_at,
           }));
           setSessions(mapped);
@@ -77,6 +78,7 @@ export default function Chat() {
   const currentQuestionNumber = s.currentQuestionNumber || 0;
   const answeredQA = s.answeredQA || [];
   const diagnosis = s.diagnosis || null;
+  const followUpMessages = s.followUpMessages || [];
 
   const pageClass = isDark
     ? "min-h-screen w-full bg-black text-zinc-100"
@@ -87,11 +89,11 @@ export default function Chat() {
     : "border border-cyan-100 bg-white/90 shadow-[0_10px_30px_rgba(2,132,199,0.12)]";
 
   // ── Core API call ─────────────────────────────────────────────────────────
-  const callApi = useCallback(async (query, currentHistory, currentQuestionCount) => {
+  const callApi = useCallback(async (query, currentHistory, currentQuestionCount, options = {}) => {
     setLoading(true);
     setError("");
     try {
-      const data = await sendChatRequest(query, currentHistory, currentQuestionCount);
+      const data = await sendChatRequest(query, currentHistory, currentQuestionCount, options);
       if (data.stage === "questioning") {
         updateActiveSession((sess) => ({
           ...sess,
@@ -102,6 +104,14 @@ export default function Chat() {
         }));
       } else if (data.stage === "final") {
         updateActiveSession((sess) => ({ ...sess, stage: "final", diagnosis: data }));
+      } else if (data.stage === "follow_up") {
+        updateActiveSession((sess) => ({
+          ...sess,
+          followUpMessages: [
+            ...(sess.followUpMessages || []),
+            { role: "assistant", content: data.answer },
+          ],
+        }));
       }
     } catch (err) {
       setError(normalizeError(err));
@@ -148,6 +158,34 @@ export default function Chat() {
     await callApi(answerText, newHistory, newCount);
   };
 
+  // ── End Chat Early (force final assessment) ───────────────────────
+  const handleForceEnd = async () => {
+    if (loading) return;
+    const userMsg = { role: "user", content: "[User ended consultation early]" };
+    const newHistory = [...history, userMsg];
+    updateActiveSession((sess) => ({ ...sess, history: newHistory }));
+    await callApi(symptom || "Please assess based on what we've discussed.", newHistory, questionCount, { forceFinal: true });
+  };
+
+  // ── Continue Chat (post-diagnosis follow-up) ────────────────────
+  const handleFollowUp = async (followUpText) => {
+    if (!followUpText.trim() || loading) return;
+    const userMsg = { role: "user", content: followUpText };
+    updateActiveSession((sess) => ({
+      ...sess,
+      followUpMessages: [...(sess.followUpMessages || []), { role: "user", content: followUpText }],
+    }));
+    const diagnosisContext = diagnosis
+      ? `Assessment: ${diagnosis.assessment}. Advice: ${(diagnosis.advice || []).join("; ")}.`
+      : "";
+    await callApi(
+      followUpText,
+      [...history, userMsg],
+      questionCount,
+      { followUpMode: true, diagnosisContext }
+    );
+  };
+
   // ── Reset ─────────────────────────────────────────────────────────────────
   const handleReset = () => {
     setAnswer("");
@@ -162,6 +200,7 @@ export default function Chat() {
       currentQuestion: null,
       currentQuestionNumber: 0,
       diagnosis: null,
+      followUpMessages: [],
       title: "New consultation",
     }));
   };
@@ -257,6 +296,7 @@ export default function Chat() {
                 answer={answer}
                 setAnswer={setAnswer}
                 onSubmit={handleSubmitAnswer}
+                onForceEnd={handleForceEnd}
                 loading={loading}
                 error={error}
                 isDark={isDark}
@@ -271,6 +311,9 @@ export default function Chat() {
                 answeredQA={answeredQA}
                 symptomSummary={symptom}
                 onReset={handleReset}
+                onFollowUp={handleFollowUp}
+                followUpMessages={followUpMessages}
+                followUpLoading={loading}
                 isDark={isDark}
                 cardClass={cardClass}
               />

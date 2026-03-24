@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaClipboardList, FaListUl, FaExclamationTriangle,
-  FaInfoCircle, FaRedo, FaHospital, FaVolumeUp, FaStop
+  FaInfoCircle, FaRedo, FaHospital, FaVolumeUp, FaStop,
+  FaCommentMedical, FaRobot, FaUserCircle, FaPaperPlane
 } from "react-icons/fa";
 
-export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, onReset, isDark, cardClass }) {
+export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, onReset, onFollowUp, followUpMessages = [], followUpLoading = false, isDark, cardClass }) {
   const navigate = useNavigate();
   const [speakingSection, setSpeakingSection] = useState(null);
+  const [followUpInput, setFollowUpInput] = useState("");
+  const followUpEndRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -16,6 +19,11 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
       }
     };
   }, []);
+
+  // Scroll to bottom of follow-up chat when messages change
+  useEffect(() => {
+    followUpEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [followUpMessages]);
 
   const handleSpeak = (section, textparts) => {
     if (!window.speechSynthesis) return;
@@ -178,6 +186,82 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
           <p>{disclaimer}</p>
         </div>
       )}
+
+      {/* ── Continue Chat ── */}
+      <div className={`rounded-3xl border p-5 ${isDark ? "border-zinc-800 bg-zinc-900/60" : "border-cyan-100 bg-cyan-50/40"}`}>
+        <div className="mb-3 flex items-center gap-2">
+          <FaCommentMedical size={13} className="text-cyan-500" />
+          <p className={`text-xs font-semibold uppercase tracking-widest ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+            Continue the conversation
+          </p>
+        </div>
+
+        {/* Thread */}
+        {followUpMessages.length > 0 && (
+          <div className="mb-3 flex max-h-64 flex-col gap-3 overflow-y-auto pr-1">
+            {followUpMessages.map((msg, i) => (
+              <div key={i} className={`flex items-start gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <div className={`mt-0.5 shrink-0 ${msg.role === "user" ? "text-cyan-500" : "text-teal-500"}`}>
+                  {msg.role === "user" ? <FaUserCircle size={18} /> : <FaRobot size={18} />}
+                </div>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? isDark ? "bg-cyan-600/20 text-cyan-100" : "bg-cyan-100 text-cyan-900"
+                      : isDark ? "bg-zinc-800 text-zinc-200" : "bg-white text-slate-700 shadow-sm"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {followUpLoading && (
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <FaRobot size={14} className="text-teal-500" />
+                <span className="loading-dot" /> Dr. BEAST is thinking…
+              </div>
+            )}
+            <div ref={followUpEndRef} />
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="flex gap-2">
+          <textarea
+            rows={1}
+            placeholder="Ask a follow-up question…"
+            value={followUpInput}
+            onChange={(e) => setFollowUpInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (followUpInput.trim() && !followUpLoading) {
+                  onFollowUp(followUpInput.trim());
+                  setFollowUpInput("");
+                }
+              }
+            }}
+            disabled={followUpLoading}
+            className={`flex-1 resize-none rounded-2xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-cyan-500 ${
+              isDark
+                ? "border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-600"
+                : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400"
+            }`}
+          />
+          <button
+            onClick={() => {
+              if (followUpInput.trim() && !followUpLoading) {
+                onFollowUp(followUpInput.trim());
+                setFollowUpInput("");
+              }
+            }}
+            disabled={!followUpInput.trim() || followUpLoading}
+            className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-2xl bg-gradient-to-br from-cyan-600 to-teal-500 text-white shadow-md transition hover:opacity-90 disabled:opacity-40"
+          >
+            <FaPaperPlane size={12} />
+          </button>
+        </div>
+      </div>
 
       {/* ── Find Nearby Hospitals ── */}
       <button

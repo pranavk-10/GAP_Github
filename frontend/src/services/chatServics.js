@@ -3,11 +3,14 @@ import { API_BASE } from "../constants/config";
 
 // ── Chat API ─────────────────────────────────────────────────────────────────
 
-export const sendChatRequest = async (query, history, questionCount = 0) => {
+export const sendChatRequest = async (query, history, questionCount = 0, options = {}) => {
   const response = await axios.post(`${API_BASE}/api/chat`, {
     query,
     history,
     question_count: questionCount,
+    force_final: options.forceFinal ?? false,
+    follow_up_mode: options.followUpMode ?? false,
+    diagnosis_context: options.diagnosisContext ?? null,
   });
   return response?.data;
 };
@@ -35,6 +38,7 @@ export const saveSession = async (session, token) => {
       current_question_number: session.currentQuestionNumber,
       answered_qa: session.answeredQA,
       diagnosis: session.diagnosis || null,
+      follow_up_messages: session.followUpMessages || [],
       created_at: session.createdAt,
     },
     { headers: authHeaders(token) }

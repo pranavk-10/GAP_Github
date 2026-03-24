@@ -324,6 +324,25 @@ export default function MapPage() {
             </button>
           </div>
         )}
+
+        {/* ── Floating hospital-loading overlay ── */}
+        {pinStatus === "loading" && mapStatus === "done" && (
+          <div className="absolute bottom-6 left-1/2 z-[1000] -translate-x-1/2">
+            <div className={`flex items-center gap-3 rounded-full px-5 py-3 shadow-xl backdrop-blur-sm ${
+              isDark
+                ? "bg-zinc-900/90 text-zinc-200 border border-zinc-700"
+                : "bg-white/90 text-slate-700 border border-slate-200"
+            }`}>
+              {/* Spinning arc ring */}
+              <span className="relative flex h-5 w-5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-spin rounded-full border-2 border-transparent border-t-cyan-500" />
+                <span className={`inline-flex h-full w-full rounded-full border-2 ${isDark ? "border-zinc-700" : "border-slate-200"}`} />
+              </span>
+              <span className="text-sm font-semibold">Searching nearby hospitals…</span>
+            </div>
+          </div>
+        )}
+
         <div ref={mapDivRef} style={{ height: "100%", width: "100%" }} />
       </div>
     </div>

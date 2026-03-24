@@ -1,4 +1,4 @@
-import { FaUserMd, FaCheck, FaPaperPlane } from "react-icons/fa";
+import { FaUserMd, FaCheck, FaPaperPlane, FaFastForward } from "react-icons/fa";
 
 export default function QuestionCard({
     question,
@@ -8,6 +8,7 @@ export default function QuestionCard({
     answer,
     setAnswer,
     onSubmit,
+    onForceEnd,
     loading,
     error,
     isDark,
@@ -22,6 +23,8 @@ export default function QuestionCard({
     };
 
     const isLastQuestion = questionNumber === totalQuestions;
+    // Show "Skip to Results" only after at least 1 question answered and not on the last question
+    const showSkip = answeredQA.length >= 1 && !isLastQuestion;
 
     return (
         <div className="fade-in flex flex-1 flex-col gap-5">
@@ -110,8 +113,25 @@ export default function QuestionCard({
                             </>
                         )}
                     </button>
+
+                    {/* Skip to Results — shown after at least 1 answer, hidden on last question */}
+                    {showSkip && (
+                        <button
+                            onClick={onForceEnd}
+                            disabled={loading}
+                            className={`mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border py-2.5 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-40 ${
+                                isDark
+                                    ? "border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-400"
+                                    : "border-amber-400/60 bg-amber-50 text-amber-600 hover:bg-amber-100 hover:border-amber-500"
+                            }`}
+                        >
+                            <FaFastForward size={10} />
+                            Skip to Results
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
+
