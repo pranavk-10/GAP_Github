@@ -79,8 +79,20 @@ Patient's initial complaint / latest message:
 """.strip()
 
 
-def build_final_prompt(query: str, history_text: str, language_code: str) -> str:
+def build_final_prompt(query: str, history_text: str, language_code: str, rag_context: str = "") -> str:
     lang = "Hindi" if language_code == "hi" else "English"
+
+    # Only inject RAG block when context was actually retrieved
+    rag_block = ""
+    if rag_context and rag_context.strip():
+        rag_block = f"""
+--- Relevant Medical Reference (from verified patient-doctor records) ---
+{rag_context.strip()}
+--- End of Reference ---
+
+Use the reference above to inform and ground your assessment where applicable.
+""".rstrip()
+
     return f"""You are a calm, empathetic medical assistant who has now gathered enough information about the patient.
 
 RULES:
@@ -105,7 +117,7 @@ RULES:
     "<warning sign 3>"
   ],
   "disclaimer": "<1 sentence educational disclaimer>"
-}}
+}}{rag_block}
 
 Conversation so far:
 {history_text}

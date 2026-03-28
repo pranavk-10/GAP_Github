@@ -1,2 +1,6 @@
 .env
 .venv
+# RAG vector store (large binary — do not commit)
+chroma_db/
+# HuggingFace dataset cache
+~/.cache/huggingface/

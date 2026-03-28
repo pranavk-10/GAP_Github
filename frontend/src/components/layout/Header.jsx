@@ -11,7 +11,7 @@ export default function Header({ isDark, setTheme, startNewChat, onBack, cardCla
               <FaArrowLeft size={18} />
             </button>
           )}
-          <h1 className="text-xl font-semibold tracking-wide">BEAST</h1>
+          <h1 className="text-xl font-semibold tracking-wide">ASHA</h1>
         </div>
 
         {/* Right: Actions */}

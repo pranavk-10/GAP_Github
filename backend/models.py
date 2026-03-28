@@ -1,5 +1,5 @@
 """
-models.py – All Pydantic request/response models for the BEAST API.
+models.py – All Pydantic request/response models for the ASHA API.
 """
 
 from typing import Literal, Optional

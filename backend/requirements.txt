@@ -8,3 +8,8 @@ python-multipart
 motor
 python-jose[cryptography]
 bcrypt
+# RAG dependencies
+chromadb
+sentence-transformers
+datasets
+tqdm

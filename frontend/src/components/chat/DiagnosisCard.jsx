@@ -218,7 +218,7 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
             {followUpLoading && (
               <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <FaRobot size={14} className="text-teal-500" />
-                <span className="loading-dot" /> Dr. BEAST is thinking…
+                <span className="loading-dot" /> Dr. ASHA is thinking…
               </div>
             )}
             <div ref={followUpEndRef} />

@@ -7,21 +7,21 @@ import { FaArrowLeft, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
 
 // ── Multi-specialty detection — returns ALL matching specialties ──────────────
 const SPECIALTY_MAP = [
-  { keywords: ["mental","psychiatr","depress","anxiety","stress","psycho","bipolar","schizo","ocd","ptsd"], label: "Mental Health", specialties: ["psychiatry","mental_health"], amenities: ["psychiatrist","psychotherapist"] },
-  { keywords: ["heart","cardiac","chest pain","cardiolog","palpitation","hypertension","blood pressure"], label: "Cardiology", specialties: ["cardiology"], amenities: ["cardiologist"] },
-  { keywords: ["skin","rash","eczema","dermatit","acne","psoriasis","allerg"], label: "Dermatology", specialties: ["dermatology"], amenities: ["dermatologist"] },
-  { keywords: ["eye","vision","sight","ophthalmol","cataract","glaucoma"], label: "Eye Care", specialties: ["ophthalmology"], amenities: ["optometrist"] },
-  { keywords: ["ear","hearing","ent","nose","throat","sinus","tonsil"], label: "ENT", specialties: ["otolaryngology"], amenities: [] },
-  { keywords: ["bone","joint","fracture","orthop","knee","spine","back pain","arthritis"], label: "Orthopaedics", specialties: ["orthopaedics","orthopedics"], amenities: [] },
-  { keywords: ["stomach","gut","gastro","digestive","liver","intestin","diarrhea","nausea"], label: "Gastroenterology", specialties: ["gastroenterology"], amenities: [] },
-  { keywords: ["neuro","brain","headache","migraine","seizure","epilep","stroke","alzheimer"], label: "Neurology", specialties: ["neurology"], amenities: ["neurologist"] },
-  { keywords: ["child","kid","infant","baby","toddler","pediatr","paediatr"], label: "Paediatrics", specialties: ["paediatrics","pediatrics"], amenities: [] },
-  { keywords: ["pregnan","gynae","gynecol","uterus","period","menstrual","fertility"], label: "Gynaecology", specialties: ["gynaecology","gynecology"], amenities: [] },
-  { keywords: ["teeth","dental","tooth","gum","cavity"], label: "Dental", specialties: [], amenities: ["dentist"] },
-  { keywords: ["kidney","urin","bladder","urolog","prostate"], label: "Urology", specialties: ["urology"], amenities: ["urologist"] },
-  { keywords: ["diabetes","thyroid","hormone","endocrin","insulin","sugar"], label: "Endocrinology", specialties: ["endocrinology"], amenities: [] },
-  { keywords: ["cancer","tumor","oncolog"], label: "Oncology", specialties: ["oncology"], amenities: [] },
-  { keywords: ["lung","breath","asthma","copd","respiratory","cough"], label: "Pulmonology", specialties: ["pulmonology"], amenities: [] },
+  { keywords: ["mental", "psychiatr", "depress", "anxiety", "stress", "psycho", "bipolar", "schizo", "ocd", "ptsd"], label: "Mental Health", specialties: ["psychiatry", "mental_health"], amenities: ["psychiatrist", "psychotherapist"] },
+  { keywords: ["heart", "cardiac", "chest pain", "cardiolog", "palpitation", "hypertension", "blood pressure"], label: "Cardiology", specialties: ["cardiology"], amenities: ["cardiologist"] },
+  { keywords: ["skin", "rash", "eczema", "dermatit", "acne", "psoriasis", "allerg"], label: "Dermatology", specialties: ["dermatology"], amenities: ["dermatologist"] },
+  { keywords: ["eye", "vision", "sight", "ophthalmol", "cataract", "glaucoma"], label: "Eye Care", specialties: ["ophthalmology"], amenities: ["optometrist"] },
+  { keywords: ["ear", "hearing", "ent", "nose", "throat", "sinus", "tonsil"], label: "ENT", specialties: ["otolaryngology"], amenities: [] },
+  { keywords: ["bone", "joint", "fracture", "orthop", "knee", "spine", "back pain", "arthritis"], label: "Orthopaedics", specialties: ["orthopaedics", "orthopedics"], amenities: [] },
+  { keywords: ["stomach", "gut", "gastro", "digestive", "liver", "intestin", "diarrhea", "nausea"], label: "Gastroenterology", specialties: ["gastroenterology"], amenities: [] },
+  { keywords: ["neuro", "brain", "headache", "migraine", "seizure", "epilep", "stroke", "alzheimer"], label: "Neurology", specialties: ["neurology"], amenities: ["neurologist"] },
+  { keywords: ["child", "kid", "infant", "baby", "toddler", "pediatr", "paediatr"], label: "Paediatrics", specialties: ["paediatrics", "pediatrics"], amenities: [] },
+  { keywords: ["pregnan", "gynae", "gynecol", "uterus", "period", "menstrual", "fertility"], label: "Gynaecology", specialties: ["gynaecology", "gynecology"], amenities: [] },
+  { keywords: ["teeth", "dental", "tooth", "gum", "cavity"], label: "Dental", specialties: [], amenities: ["dentist"] },
+  { keywords: ["kidney", "urin", "bladder", "urolog", "prostate"], label: "Urology", specialties: ["urology"], amenities: ["urologist"] },
+  { keywords: ["diabetes", "thyroid", "hormone", "endocrin", "insulin", "sugar"], label: "Endocrinology", specialties: ["endocrinology"], amenities: [] },
+  { keywords: ["cancer", "tumor", "oncolog"], label: "Oncology", specialties: ["oncology"], amenities: [] },
+  { keywords: ["lung", "breath", "asthma", "copd", "respiratory", "cough"], label: "Pulmonology", specialties: ["pulmonology"], amenities: [] },
 ];
 
 // Returns ALL matching specialties (not just first)
@@ -40,8 +40,8 @@ function detectSpecialties(text) {
 function getMarkerStyle(h) {
   if (h.matchedLabel) return { bg: "#f97316", size: 18, star: true };   // specialty
   if (h.type === "hospital") return { bg: "#ef4444", size: 14, star: false };
-  if (h.type === "clinic")   return { bg: "#8b5cf6", size: 13, star: false };
-  return                            { bg: "#10b981", size: 13, star: false }; // doctor/GP
+  if (h.type === "clinic") return { bg: "#8b5cf6", size: 13, star: false };
+  return { bg: "#10b981", size: 13, star: false }; // doctor/GP
 }
 
 function makeDivIcon({ bg, size, star }) {
@@ -56,41 +56,78 @@ function makeDivIcon({ bg, size, star }) {
   });
 }
 
+// ── Overpass API — robust fetcher with JSON validation ────────────────────────
+// Tries endpoints in order; skips any that return non-JSON (XML error pages) or non-OK status.
+async function executeOverpassQuery(query) {
+  // kumi.systems is most reliable for large queries; fallbacks for redundancy
+  const endpoints = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://lz4.overpass-api.de/api/interpreter",
+    "https://z.overpass-api.de/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+  ];
+
+  for (const url of endpoints) {
+    try {
+      // Use POST to avoid URL length limits and bypass some server-side GET rate limits
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+
+      if (!res.ok) {
+        console.warn(`Overpass ${url} responded ${res.status}, skipping.`);
+        continue;
+      }
+
+      // Validate it's actually JSON before parsing (some servers return XML error pages)
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("json")) {
+        console.warn(`Overpass ${url} returned non-JSON (${contentType}), skipping.`);
+        continue;
+      }
+
+      const data = await res.json();
+      if (data && data.elements) return data;
+
+    } catch (e) {
+      console.warn(`Overpass ${url} network error:`, e.message);
+    }
+  }
+  return null;
+}
+
 // ── Overpass query — hospitals + clinics + doctors + health centres ───────────
 async function fetchFacilities(lat, lon, specialties) {
-  const r = 7000;
+  const r = 5000; // 5km radius — good coverage; 7km causes 504 timeouts in dense cities
 
-  // Collect all specialty tags across all matched specialties
   const allSpecialtyTags = [...new Set(specialties.flatMap((s) => s.specialties))];
   const allSpecialtyAmenities = [...new Set(specialties.flatMap((s) => s.amenities))];
 
-  const spLines = [
-    ...allSpecialtyTags.flatMap((s) => [
-      `node["healthcare:speciality"="${s}"](around:${r},${lat},${lon});`,
-      `way["healthcare:speciality"="${s}"](around:${r},${lat},${lon});`,
-    ]),
-    ...allSpecialtyAmenities.map((a) => `node["amenity"="${a}"](around:${r},${lat},${lon});`),
-  ].join("\n");
+  // Single query using regex unions — far less server-side work than 20+ individual tag checks.
+  // `nwr` = node + way + relation in one shot.
+  const amenitySet = ["hospital", "clinic", "doctors", "health_post", ...allSpecialtyAmenities];
+  const amenityRegex = amenitySet.join("|");
+  const hcRegex = ["doctor", "centre", "clinic"].join("|");
 
-  const query = `
-    [out:json][timeout:20];
-    (
-      ${spLines}
-      node["amenity"="hospital"](around:${r},${lat},${lon});
-      way["amenity"="hospital"](around:${r},${lat},${lon});
-      node["amenity"="clinic"](around:${r},${lat},${lon});
-      way["amenity"="clinic"](around:${r},${lat},${lon});
-      node["amenity"="doctors"](around:${r},${lat},${lon});
-      node["amenity"="health_post"](around:${r},${lat},${lon});
-      node["healthcare"="doctor"](around:${r},${lat},${lon});
-      node["healthcare"="centre"](around:${r},${lat},${lon});
-      node["healthcare"="clinic"](around:${r},${lat},${lon});
-    );
-    out center 50;
-  `;
+  const spQuery = allSpecialtyTags.length > 0
+    ? `nwr["healthcare:speciality"~"^(${allSpecialtyTags.join("|")})$"](around:${r},${lat},${lon});`
+    : "";
 
-  const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-  const data = await res.json();
+  const query = `[out:json][timeout:20];
+(
+  ${spQuery}
+  nwr["amenity"~"^(${amenityRegex})$"](around:${r},${lat},${lon});
+  nwr["healthcare"~"^(${hcRegex})$"](around:${r},${lat},${lon});
+);
+out center 50;`;
+
+  const data = await executeOverpassQuery(query);
+
+  if (!data || !data.elements) {
+    throw new Error("Could not load map data. Overpass API unavailable.");
+  }
 
   const seen = new Set();
   return data.elements
@@ -106,19 +143,16 @@ async function fetchFacilities(lat, lon, specialties) {
       const hc = el.tags?.healthcare || "";
       const hcSpec = el.tags?.["healthcare:speciality"] || "";
 
-      // Determine facility type
       let type = "gp";
       if (amenity === "hospital") type = "hospital";
       else if (amenity === "clinic" || hc === "clinic" || hc === "centre") type = "clinic";
 
-      // Check if this element matches any of the detected specialties
       const matchedSpec = specialties.find(
         (s) =>
           s.specialties.some((sp) => hcSpec === sp) ||
           s.amenities.some((a) => amenity === a)
       );
 
-      // Fallback name
       const defaultName =
         type === "hospital" ? "Hospital" : type === "clinic" ? "Clinic" : "Health Centre / GP";
 
@@ -133,7 +167,6 @@ async function fetchFacilities(lat, lon, specialties) {
       };
     })
     .filter(Boolean)
-    // Sort: specialty first, then hospital, then clinic, then GP
     .sort((a, b) => {
       const rank = (h) => (h.matchedLabel ? 0 : h.type === "hospital" ? 1 : h.type === "clinic" ? 2 : 3);
       return rank(a) - rank(b);
@@ -212,11 +245,11 @@ export default function MapPage() {
             const typeLabel =
               h.matchedLabel
                 ? `<span style="font-size:10px;background:#f97316;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">${h.matchedLabel}</span>`
-              : h.type === "hospital"
-                ? `<span style="font-size:10px;background:#ef4444;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">Hospital</span>`
-              : h.type === "clinic"
-                ? `<span style="font-size:10px;background:#8b5cf6;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">Clinic</span>`
-                : `<span style="font-size:10px;background:#10b981;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">GP / Health Centre</span>`;
+                : h.type === "hospital"
+                  ? `<span style="font-size:10px;background:#ef4444;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">Hospital</span>`
+                  : h.type === "clinic"
+                    ? `<span style="font-size:10px;background:#8b5cf6;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">Clinic</span>`
+                    : `<span style="font-size:10px;background:#10b981;color:#fff;border-radius:4px;padding:1px 6px;display:inline-block;margin-bottom:4px">GP / Health Centre</span>`;
 
             const popup = `
               <div style="min-width:170px;font-family:sans-serif">
@@ -328,11 +361,10 @@ export default function MapPage() {
         {/* ── Floating hospital-loading overlay ── */}
         {pinStatus === "loading" && mapStatus === "done" && (
           <div className="absolute bottom-6 left-1/2 z-[1000] -translate-x-1/2">
-            <div className={`flex items-center gap-3 rounded-full px-5 py-3 shadow-xl backdrop-blur-sm ${
-              isDark
+            <div className={`flex items-center gap-3 rounded-full px-5 py-3 shadow-xl backdrop-blur-sm ${isDark
                 ? "bg-zinc-900/90 text-zinc-200 border border-zinc-700"
                 : "bg-white/90 text-slate-700 border border-slate-200"
-            }`}>
+              }`}>
               {/* Spinning arc ring */}
               <span className="relative flex h-5 w-5 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-spin rounded-full border-2 border-transparent border-t-cyan-500" />

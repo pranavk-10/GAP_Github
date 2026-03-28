@@ -68,7 +68,7 @@ export default function QuestionCard({
                     </div>
                     <div>
                         <p className={`text-xs font-semibold uppercase tracking-widest ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
-                            Dr. BEAST {isLastQuestion && "· Last question"}
+                            Dr. ASHA {isLastQuestion && "· Last question"}
                         </p>
                     </div>
                 </div>

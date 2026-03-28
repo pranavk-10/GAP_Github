@@ -1,5 +1,5 @@
 """
-main.py – FastAPI application entry point for BEAST.
+main.py – FastAPI application entry point for ASHA.
 
 Structure:
   main.py          ← you are here (app setup, lifespan, CORS)
@@ -31,6 +31,7 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # ── Gemini ─────────────────────────────────────────────────────────────────
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
@@ -42,12 +43,23 @@ async def lifespan(_: FastAPI):
         app_state["gemini_model"] = None
         print("⚠️  GEMINI_API_KEY not set — AI responses unavailable.")
 
+    # ── RAG service ────────────────────────────────────────────────────────────
+    try:
+        from rag.rag_service import rag_service
+        rag_service.initialise()
+        if rag_service.is_ready:
+            print("✅ RAG service initialised — vector store loaded")
+        else:
+            print("⚠️  RAG service not ready — run `python -m rag.ingest` to build the vector store")
+    except Exception as exc:
+        print(f"⚠️  RAG service failed to load ({exc}) — continuing without RAG")
+
     yield
     app_state.clear()
 
 
 app = FastAPI(
-    title="BEAST API",
+    title="ASHA API",
     description="Bilingual Engine for AI Symptom Triage",
     version="1.0.0",
     lifespan=lifespan,

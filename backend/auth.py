@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("JWT_SECRET", "beast-super-secret-key-change-me")
+SECRET_KEY = os.getenv("JWT_SECRET", "asha-super-secret-key-change-me")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
 

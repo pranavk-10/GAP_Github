@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaRobot, FaSun, FaMoon, FaBookOpen } from "react-icons/fa";
 import useTheme from "../hooks/useTheme";
 
-const LOGO_PATH = "/Beast-logo.webp";
+const LOGO_PATH = "/Asha-logo.webp";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export default function Home() {
                   <FaRobot size={17} />
                 )}
               </div>
-              <p className="text-xl font-semibold tracking-wide">BEAST Health</p>
+              <p className="text-xl font-semibold tracking-wide">ASHA Health</p>
             </div>
 
             <div className="hidden items-center gap-8 text-sm md:flex">
@@ -60,19 +60,19 @@ export default function Home() {
             <p className={isDark ? "text-sm uppercase tracking-[0.2em] text-cyan-300" : "text-sm uppercase tracking-[0.2em] text-cyan-700"}>Clinical AI Companion</p>
             <h1 className="mt-4 text-5xl leading-[1.1] sm:text-6xl" style={{ fontFamily: "Georgia, serif" }}>Calm medical guidance, any hour.</h1>
             <p className={isDark ? "mt-5 max-w-xl text-lg text-zinc-300" : "mt-5 max-w-xl text-lg text-slate-700"}>
-              Designed for structured triage. BEAST asks logical follow-ups, tracks context across sessions.
+              Designed for structured triage. ASHA asks logical follow-ups, tracks context across sessions.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <button onClick={() => navigate("/chat")} className="rounded-full bg-cyan-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700">Chat with BEAST</button>
+              <button onClick={() => navigate("/chat")} className="rounded-full bg-cyan-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700">Chat with ASHA</button>
               <button onClick={() => setShowInfo(!showInfo)} className={isDark ? "rounded-full border border-zinc-700 bg-zinc-900 px-6 py-3 text-sm font-semibold text-zinc-100" : "rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700"}>
-                <FaBookOpen className="mr-2 inline-block" /> How BEAST works
+                <FaBookOpen className="mr-2 inline-block" /> How ASHA works
               </button>
             </div>
 
             {showInfo && (
               <div className={isDark ? "mt-6 rounded-2xl border border-zinc-700 bg-zinc-900/80 p-4 text-sm text-zinc-300" : "mt-6 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm text-slate-700"}>
-                BEAST does not diagnose disease. It provides educational guidance.
+                ASHA does not diagnose disease. It provides educational guidance.
               </div>
             )}
           </section>
@@ -100,7 +100,7 @@ export default function Home() {
                 It's throbbing, about a 7/10.
               </div>
               <div className={isDark ? "max-w-[90%] rounded-2xl border border-zinc-700 bg-zinc-900 p-4 text-sm leading-6 text-zinc-200" : "max-w-[90%] rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700"}>
-                <p className={`text-xs font-semibold mb-1 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>Dr. BEAST · Question 2</p>
+                <p className={`text-xs font-semibold mb-1 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>Dr. ASHA · Question 2</p>
                 <p className="font-medium">Do you have any associated symptoms like nausea, light or sound sensitivity?</p>
               </div>
             </div>

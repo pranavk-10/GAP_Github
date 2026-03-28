@@ -1,6 +1,6 @@
 export const buildInitialMessage = () => ({
   sender: "bot",
-  text: "Welcome to BEAST. Describe your symptom and I'll ask a few questions — one at a time — before giving you personalised guidance.",
+  text: "Welcome to ASHA. Describe your symptom and I'll ask a few questions — one at a time — before giving you personalised guidance.",
   time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
 });
 

@@ -4,8 +4,8 @@
  */
 import { useState } from "react";
 
-const TOKEN_KEY = "beast_token";
-const USER_KEY = "beast_user";
+const TOKEN_KEY = "asha_token";
+const USER_KEY = "asha_user";
 
 export default function useAuth() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || null);

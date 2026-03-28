@@ -1,25 +1,40 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # MedQuAD downloaded files
 backend/MedQuAD-master/
 backend/MedQuAD.zip
 
-# Model cache
+# Model cache (sentence-transformers, HuggingFace)
 .cache/
 *.pt
 *.bin
+*.safetensors
+backend/.cache/
+backend/models/
 
 # Virtual environment
 venv/
+.venv/
 .env
 .env.*
+
 # Node
 frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# VS Code
 .vscode/
+
+# Python build artifacts
+*.egg-info/
+dist/
+build/
