@@ -3,13 +3,27 @@ import { useNavigate } from "react-router-dom";
 import {
   FaClipboardList, FaListUl, FaExclamationTriangle,
   FaInfoCircle, FaRedo, FaHospital, FaVolumeUp, FaStop,
-  FaCommentMedical, FaRobot, FaUserCircle, FaPaperPlane
+  FaCommentMedical, FaRobot, FaUserCircle, FaPaperPlane,
+  FaChevronDown, FaHome
 } from "react-icons/fa";
+
+/** Convert markdown-style **bold** to <strong> tags */
+function formatText(text) {
+  if (!text) return text;
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
 
 export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, onReset, onFollowUp, followUpMessages = [], followUpLoading = false, isDark, cardClass }) {
   const navigate = useNavigate();
   const [speakingSection, setSpeakingSection] = useState(null);
   const [followUpInput, setFollowUpInput] = useState("");
+  const [showRemedies, setShowRemedies] = useState(false);
   const followUpEndRef = useRef(null);
 
   useEffect(() => {
@@ -53,14 +67,31 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
   };
 
   if (!diagnosis) return null;
-  const { assessment, advice = [], red_flags = [], disclaimer } = diagnosis;
+  const { assessment, advice = [], red_flags = [], home_remedies = [], severity = "moderate", disclaimer } = diagnosis;
+
+  // Severity badge config
+  const severityConfig = {
+    mild:     { label: "Mild",     color: "emerald", emoji: "🟢", desc: "Likely manageable at home" },
+    moderate: { label: "Moderate", color: "amber",   emoji: "🟡", desc: "Consider visiting a doctor" },
+    severe:   { label: "Severe",   color: "red",     emoji: "🔴", desc: "Seek medical attention soon" },
+  };
+  const sev = severityConfig[severity] || severityConfig.moderate;
 
   return (
     <div className="fade-in flex flex-1 flex-col gap-5 pb-8">
-      {/* ── Consultation complete badge ── */}
-      <div className="flex items-center gap-2">
+      {/* ── Consultation complete + severity badges ── */}
+      <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/15 px-4 py-1.5 text-xs font-semibold text-teal-500">
           <span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> Consultation complete
+        </span>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold ${
+          severity === "mild"
+            ? "bg-emerald-500/15 text-emerald-500"
+            : severity === "severe"
+              ? "bg-red-500/15 text-red-500"
+              : "bg-amber-500/15 text-amber-500"
+        }`}>
+          {sev.emoji} {sev.label} — {sev.desc}
         </span>
       </div>
 
@@ -105,7 +136,7 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
           </button>
         </div>
         <p className={`text-sm leading-relaxed ${isDark ? "text-zinc-200" : "text-slate-700"}`}>
-          {assessment}
+          {formatText(assessment)}
         </p>
       </div>
 
@@ -138,7 +169,7 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
                 <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-[10px] font-bold text-teal-500">
                   {i + 1}
                 </span>
-                {item}
+                {formatText(item)}
               </li>
             ))}
           </ul>
@@ -172,10 +203,84 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
             {red_flags.map((flag, i) => (
               <li key={i} className={`flex items-start gap-2 text-sm ${isDark ? "text-red-300" : "text-red-700"}`}>
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                {flag}
+                {formatText(flag)}
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* ── Self-Care / Home Remedies (collapsed by default) ── */}
+      {home_remedies.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowRemedies(!showRemedies)}
+            className={`flex w-full items-center justify-between rounded-2xl px-6 py-3.5 text-sm font-semibold transition-all ${
+              showRemedies
+                ? isDark
+                  ? "rounded-b-none border border-b-0 border-amber-800/50 bg-amber-950/40 text-amber-400"
+                  : "rounded-b-none border border-b-0 border-amber-200 bg-amber-50 text-amber-700"
+                : isDark
+                  ? "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-amber-700 hover:text-amber-400"
+                  : "border border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-600 shadow-sm"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <FaHome size={13} />
+              {showRemedies ? "Hide Self-Care Tips" : "Show Self-Care Tips"}
+            </span>
+            <FaChevronDown
+              size={11}
+              className={`transition-transform duration-300 ${showRemedies ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {showRemedies && (
+            <div className={`fade-in rounded-b-2xl border border-t-0 p-6 ${
+              isDark
+                ? "border-amber-800/50 bg-amber-950/20"
+                : "border-amber-200 bg-amber-50/60"
+            }`}>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15">
+                    <FaHome size={14} className="text-amber-500" />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-amber-500">Self-Care Tips</h3>
+                </div>
+
+                <button
+                  onClick={() => handleSpeak('remedies', home_remedies)}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    speakingSection === 'remedies'
+                      ? "bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                      : "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                  }`}
+                  title={speakingSection === 'remedies' ? "Stop Voice" : "Read Aloud"}
+                >
+                  {speakingSection === 'remedies' ? <FaStop size={12} /> : <FaVolumeUp size={14} />}
+                </button>
+              </div>
+
+              <ul className="flex flex-col gap-2">
+                {home_remedies.map((remedy, i) => (
+                  <li key={i} className={`flex items-start gap-3 text-sm ${isDark ? "text-amber-200/80" : "text-amber-900"}`}>
+                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[10px] font-bold text-amber-600">
+                      {i + 1}
+                    </span>
+                    {formatText(remedy)}
+                  </li>
+                ))}
+              </ul>
+
+              <p className={`mt-4 flex items-start gap-2 rounded-xl p-3 text-xs ${
+                isDark ? "bg-amber-950/40 text-amber-400/70" : "bg-amber-100/80 text-amber-700"
+              }`}>
+                <FaExclamationTriangle size={11} className="mt-0.5 shrink-0" />
+                Stop any remedy immediately if symptoms worsen. These are general self-care suggestions, not prescriptions.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -183,7 +288,7 @@ export default function DiagnosisCard({ diagnosis, answeredQA, symptomSummary, o
       {disclaimer && (
         <div className={`flex items-start gap-3 rounded-2xl p-4 text-xs ${isDark ? "bg-zinc-900 text-zinc-500" : "bg-slate-50 text-slate-500"}`}>
           <FaInfoCircle size={12} className="mt-0.5 shrink-0 text-slate-400" />
-          <p>{disclaimer}</p>
+          <p>{formatText(disclaimer)}</p>
         </div>
       )}
 

@@ -30,9 +30,11 @@ class QuestioningResponse(BaseModel):
 
 class FinalResponse(BaseModel):
     stage: Literal["final"]
+    severity: str = "moderate"          # "mild" | "moderate" | "severe"
     assessment: str
     advice: list[str]
     red_flags: list[str]
+    home_remedies: list[str] = []       # Self-care steps (hidden behind toggle in UI)
     disclaimer: str
 
 
